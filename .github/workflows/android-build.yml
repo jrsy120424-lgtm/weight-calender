@@ -27,19 +27,27 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
+      # GitHub 的 ubuntu-latest 已预装 Android SDK（ANDROID_HOME 已存在）。
+      # 不再使用 android-actions/setup-android：它会执行 sdkmanager tools，
+      # 而新版 cmdline-tools 已移除 tools 包，导致该步骤必然失败。
+      - name: Prepare Android SDK
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+          echo "using sdkmanager: $SDKM"
+          yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+          "$SDKM" --install "platforms;android-35" "build-tools;35.0.0" || true
+          echo "--- platforms ---"; ls "$ANDROID_HOME/platforms"
+          echo "--- build-tools ---"; ls "$ANDROID_HOME/build-tools"
 
       - name: Build APK
         run: gradle --no-daemon assembleDebug
 
       - name: Rename APK
-        run: mkdir -p release && cp app/build/outputs/apk/debug/app-debug.apk release/体重日历-debug.apk
+        run: |
+          mkdir -p release
+          cp app/build/outputs/apk/debug/app-debug.apk "release/体重日历-debug.apk"
+          ls -la release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
